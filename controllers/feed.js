@@ -52,18 +52,22 @@ exports.createPost = async (req, res, next)=>{
     const errors = validationResult(req);
     !errors.isEmpty() && throwCustomError('Validation failed, incorrect data provided', 422, errors);
     !req.file && throwCustomError('No file attached cannot create travel Post', 422);
+    const user = await User.findById(req.userId)
+
     const title = req.body.title;
     const content = req.body.content; 
     const longitude = req.body.longitude;
     const latitude = req.body.latitude;
     const imageUrl = req.file.path;
+    
     const post = new Post({
         title,
         content,
         creator: req.userId,
         imageUrl,
         longitude,
-        latitude
+        latitude,
+        validated:user.admin
     });
     try{
         await post.save();
