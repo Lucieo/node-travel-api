@@ -18,6 +18,10 @@ const userSchema = new Schema({
         type: String,
         default: 'junior venturer'
     },
+    admin:{
+        type: Boolean,
+        default: false
+    },
     posts: [{
         type: Schema.Types.ObjectId,
         ref: 'Post'

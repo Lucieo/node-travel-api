@@ -1,14 +1,32 @@
 const path = require('path');
+const fs = require('fs');
+
 const express = require('express');
 const bodyParser = require('body-parser');
 const mongoose = require('mongoose');
 const {mongoUrl} = require('./utils/connect');
 const multer = require('multer');
+const morgan = require('morgan');
+const helmet = require('helmet');
+const compression = require('compression');
+
+const {postCleaningCron} = require('./cron-jobs')
 
 const feedRoutes = require('./routes/feed');
 const authRoutes = require('./routes/auth');
 
 const app = express();
+
+//Secure headers
+app.use(helmet());
+//Compress
+app.use(compression());
+//Logging request data
+const accessLogStream = fs.createWriteStream(
+   path.join(__dirname, 'access.log'),
+   {flags: 'a'}//append at the end of a file
+)
+app.use(morgan('combined', {stream: accessLogStream}))
 
 //MULTER Where to store uploaded files => where to save / how to name file
 const fileStorage = multer.diskStorage({
@@ -57,6 +75,8 @@ app.use((error, req, res, next)=>{
     const data = error.data;
     res.status(status).json({message, data})
 });
+
+postCleaningCron()
 
 mongoose
 .connect(mongoUrl)

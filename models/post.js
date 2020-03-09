@@ -18,6 +18,18 @@ const postSchema = new Schema({
         type: Schema.Types.ObjectId,
         ref: 'User',
         required: true
+    },
+    longitude:{
+        type: Number,
+        default: '2.3488'
+    },
+    latitude:{
+        type: Number,
+        default: '48.8534'
+    },
+    validated:{
+        type: Boolean,
+        default: false
     }
 }, 
 {timestamps: true})

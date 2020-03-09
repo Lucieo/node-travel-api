@@ -9,7 +9,7 @@ exports.clearImage = filePath =>{
 exports.throwCustomError = (message, code, errors=undefined)=>{
     const error = new Error(message);
     error.statusCode = code;
-    error.data = errors.array();
+    errors && (error.data = errors.array());
     throw error;
 }
 

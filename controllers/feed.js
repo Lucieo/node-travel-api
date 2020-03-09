@@ -21,11 +21,16 @@ exports.getPost = (req, res, next)=>{
 }
 
 exports.getPosts = async (req, res, next)=>{
-    const currentPage = req.query.page || 1;
-    const perPage = 2;
+    const currentPage = +req.query.page || 1;
+    const ownPosts = Boolean(req.query.ownPosts==='true'? 1 : 0);
+    const perPage = 8;
+    const query = ownPosts ? {creator: req.userId.toString()}:{validated: true}
     try{
-        const totalItems = await Post.find().countDocuments()
-        const posts = await Post.find()
+        const totalItems = await Post
+        .find(query)
+        .countDocuments();
+        const lastPage = totalItems/perPage;
+        const posts = await Post.find(query)
             .populate('creator')
             .sort({createdAt:-1})
             .skip((currentPage - 1) * perPage)
@@ -36,6 +41,7 @@ exports.getPosts = async (req, res, next)=>{
             message: "Fetched posts",
             posts,
             totalItems,
+            lastPage,
         })
     }catch(err){
         throwServerError(err, next);
@@ -48,12 +54,16 @@ exports.createPost = async (req, res, next)=>{
     !req.file && throwCustomError('No file attached cannot create travel Post', 422);
     const title = req.body.title;
     const content = req.body.content; 
+    const longitude = req.body.longitude;
+    const latitude = req.body.latitude;
     const imageUrl = req.file.path;
     const post = new Post({
         title,
         content,
         creator: req.userId,
-        imageUrl
+        imageUrl,
+        longitude,
+        latitude
     });
     try{
         await post.save();
@@ -87,27 +97,32 @@ exports.updatePost = async(req, res, next)=>{
     const postId = req.params.postId;
     const title = req.body.title;
     const content = req.body.content;
-    let imageUrl = req.body.imageUrl;
+    const longitude = req.body.longitude;
+    const latitude = req.body.latitude;
+
+    let imageUrl;
     if (req.file){
         imageUrl = req.file.path;
     }
-    !imageUrl && throwCustomError('No file picked', 422);
 
     try{
         const post = await Post.findById(postId)
         .populate('creator')
         !post && throwCustomError('Post not found', 404);
         (post.creator._id.toString()!==req.userId) && throwCustomError('Not authorized', 401);
-        if (imageUrl!== post.imageUrl){
-            clearImage(post.imageUrl)
+        if (imageUrl && imageUrl!== post.imageUrl){
+            clearImage(post.imageUrl);
+            post.imageUrl = imageUrl;
         }
         post.title = title;
-        post.imageUrl = imageUrl;
         post.content = content;
+        post.longitude = longitude;
+        post.latitude = latitude;
         await post.save();
+        io.getIO().emit('posts', {action: 'update', post})
         res
         .status(200)
-        .json({message: 'Post updated', post: result})
+        .json({message: 'Post updated', post})
     }
     catch(err){
         throwServerError(err, next)
@@ -123,7 +138,7 @@ exports.deletePost = async(req, res, next)=>{
         clearImage(post.imageUrl);
         await Post.findByIdAndRemove(postId)
         const user = await User.findById(req.userId)
-        user.post.pull(postId);
+        user.posts.pull(postId);
         await user.save();
         io.getIO().emit('posts', {action: 'delete', post: postId})
         return res.status(200)
